@@ -16,7 +16,8 @@ const int ThrottlePin = 7;
 
 // Padding for throttle
 const int Padding = 50;
-const int PivotAngle = 25;
+const int PivotAngle = 10;
+const double DriveAngleConversion = 90 - PivotAngle;  // this is used to calculate the amount of turn when driving
 
 void setup() {
   Serial.begin(9600);
@@ -47,6 +48,10 @@ void loop() {
     throttle = map(throttle, 1000, 2000, -500, 500);
     throttle = constrain(throttle, -255, 255);
 
+// // uncomment this for quick testing of values
+//  if (true) {
+//    aileron = 255;
+//    throttle = 0;
 
     // Print debug info
     Serial.print("Aileron:");
@@ -90,6 +95,8 @@ void loop() {
     
     Serial.print(" | Speed:");
     Serial.print(speed);
+
+    Serial.print(" | Action: ");
     
     // check for action to perform
     if (_in(aileron, -Padding, Padding) && _in(throttle, -Padding, Padding)) {
@@ -107,6 +114,8 @@ void loop() {
     Serial.print(aileron);
     Serial.print(" | Throttle:");
     Serial.print(throttle);
+
+    stop();
   }
 
   Serial.println();
@@ -116,7 +125,7 @@ void loop() {
 boolean _in(int value, int lowerBound, int upperBound) {
   boolean in = false;
 
-  if (value > lowerBound && value < upperBound) {
+  if (value >= lowerBound && value <= upperBound) {
     in = true;
   }
   
@@ -128,66 +137,72 @@ float _angle(int y, int x) {
 }
 
 void drive(int angle, int speed) {
-//  int leftSpeed = speed;
-//  int rightSpeed = speed;
+  int leftSpeed = speed;
+  int rightSpeed = speed;  
 
-  Serial.print(" Drive");
+  Serial.print("Drive - ");
 
-//  if (aileron >= 0 && throttle >= 0) {
-//    // +, +
-//    // reduce right speed
-//    rightSpeed = rightSpeed - aileron;
-//
-//    // go forward
-//    forward(motorLeft, leftSpeed);
-//    forward(motorRight, max(rightSpeed, 0));
-//  } else if (aileron < 0 && throttle >= 0) {
-//    // -, +
-//    // reduce left speed
-//    leftSpeed = leftSpeed + aileron;
-//
-//    // go forward
-//    forward(motorLeft, max(leftSpeed, 0));
-//    forward(motorRight, rightSpeed);    
-//  } else if (aileron < 0 && throttle < 0) {
-//    // -, -
-//    // reduce left speed
-//    leftSpeed = leftSpeed - aileron;
-//
-//    // go backward
-//    backward(motorLeft, min(leftSpeed, 0));
-//    backward(motorRight, rightSpeed);
-//  } else if (aileron >= 0 && throttle <  0) {
-//    // +, -
-//    // reduce right speed
-//    rightSpeed = rightSpeed + aileron;
-//
-//    // go backward
-//    backward(motorLeft, leftSpeed);
-//    backward(motorRight, min(rightSpeed, 0));
-//  }
+  if (angle == 90 || angle == 270) {
+    leftSpeed = speed;
+    rightSpeed = speed;
+  } else if (angle < 90) {
+    rightSpeed = rightSpeed * ((angle - PivotAngle) / DriveAngleConversion);
+  } else if (angle > 90 && angle < 180) {
+    leftSpeed = leftSpeed * ((180 - PivotAngle - angle) / DriveAngleConversion);  
+  } else if (angle > 180 && angle < 270) {
+    leftSpeed = leftSpeed * ((angle - 180 - PivotAngle) / DriveAngleConversion);
+  } else if (angle > 270) {
+    rightSpeed = rightSpeed * ((360 - PivotAngle - angle) / DriveAngleConversion);
+  }
+
+  if (angle <= 180) {
+    Serial.print("Left: ");
+    Serial.print(leftSpeed);
+    Serial.print(" Right: ");
+    Serial.print(rightSpeed);
+    
+    forward(motorLeft, leftSpeed);
+    forward(motorRight, rightSpeed);
+  } else {
+    Serial.print("Left: -");
+    Serial.print(leftSpeed);
+    Serial.print(" Right: -");
+    Serial.print(rightSpeed);
+    
+    backward(motorLeft, leftSpeed);
+    backward(motorRight, rightSpeed);    
+  }
 }
 
 void pivot(int angle, int speed) {
-//  int leftSpeed = aileron;
-//  int rightSpeed = aileron;
-//
-//  if (aileron >= 0) {
-//    forward(motorLeft, leftSpeed);
-//    backward(motorRight, rightSpeed);
-//  } else {
-//    backward(motorLeft, leftSpeed);
-//    forward(motorRight, rightSpeed);    
-//  }
+  int leftSpeed = speed;
+  int rightSpeed = speed;
 
-  Serial.print(" Pivot");
+  Serial.print("Pivot - ");
+
+  if (angle > 90 && angle < 270) {
+    Serial.print("Left: -");
+    Serial.print(leftSpeed);
+    Serial.print(" Right: ");
+    Serial.print(rightSpeed);
+    
+    backward(motorLeft, leftSpeed);
+    forward(motorRight, rightSpeed); 
+  } else {
+    Serial.print("Left: ");
+    Serial.print(leftSpeed);
+    Serial.print(" Right: -");
+    Serial.print(rightSpeed);
+    
+    forward(motorLeft, leftSpeed);
+    backward(motorRight, rightSpeed);    
+  }
 }
 
 void forward(Adafruit_DCMotor* motor, int speed) {
   motor->setSpeed(abs(speed));
   motor->run(FORWARD);
 }
-
 
 void backward(Adafruit_DCMotor* motor, int speed) {
   motor->setSpeed(abs(speed));
